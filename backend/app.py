@@ -5,12 +5,38 @@ import os
 import json
 import datetime
 from datetime import datetime, timedelta
+import threading
+import time
+import subprocess
+import re
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
 CORS(app)
 
 DEVICE_EVENTS_FILE = 'device_events.csv'
 USER_CONFIG_FILE = 'user_config.json'
+
+# USB Device Monitor Configuration
+USB_CHECK_INTERVAL = 3  # Check every 3 seconds
+PHONE_PATTERNS = [
+    r'iPhone|iPad|iPod',  # Apple devices
+    r'Samsung|Galaxy',    # Samsung devices
+    r'Google|Pixel',      # Google devices
+    r'OnePlus',          # OnePlus devices
+    r'Huawei|Honor',     # Huawei devices
+    r'Xiaomi|Mi|Redmi',  # Xiaomi devices
+    r'LG.*Phone',        # LG phones
+    r'HTC',              # HTC devices
+    r'Sony.*Xperia',     # Sony devices
+    r'Motorola|Moto',    # Motorola devices
+    r'Nokia',            # Nokia devices
+    r'OPPO|Vivo',        # OPPO/Vivo devices
+]
+
+# Global variables for device monitoring
+connected_devices = set()
+device_monitor_running = False
+device_monitor_thread = None
 
 def init_events_file():
     if not os.path.exists(DEVICE_EVENTS_FILE):
@@ -217,6 +243,150 @@ def log_device_event(is_connected, device_name=""):
         print(f"Error logging device event: {e}")
         raise
 
+def get_usb_devices():
+    """Get list of connected USB devices using lsusb"""
+    try:
+        # Run lsusb command
+        result = subprocess.run(['lsusb'], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            return result.stdout.strip().split('\n')
+        else:
+            print(f"lsusb command failed with return code {result.returncode}")
+            return []
+    except subprocess.TimeoutExpired:
+        print("lsusb command timed out")
+        return []
+    except FileNotFoundError:
+        print("lsusb command not found. Make sure usbutils is installed.")
+        return []
+    except Exception as e:
+        print(f"Error running lsusb: {e}")
+        return []
+
+def extract_device_info(lsusb_line):
+    """Extract device name from lsusb output line"""
+    try:
+        # lsusb output format: "Bus 001 Device 002: ID 1234:5678 Device Name"
+        # We want to extract the device name part after the ID
+        parts = lsusb_line.split(': ID ')
+        if len(parts) > 1:
+            # Get everything after "ID xxxx:xxxx "
+            device_part = parts[1]
+            # Remove the vendor:product ID and keep the description
+            id_and_name = device_part.split(' ', 1)
+            if len(id_and_name) > 1:
+                return id_and_name[1].strip()
+        return ""
+    except Exception as e:
+        print(f"Error extracting device info from '{lsusb_line}': {e}")
+        return ""
+
+def is_phone_device(device_name):
+    """Check if device name matches phone patterns"""
+    if not device_name:
+        return False
+    
+    for pattern in PHONE_PATTERNS:
+        if re.search(pattern, device_name, re.IGNORECASE):
+            return True
+    return False
+
+def get_connected_phones():
+    """Get list of currently connected phone devices"""
+    phones = set()
+    usb_devices = get_usb_devices()
+    
+    for device_line in usb_devices:
+        device_name = extract_device_info(device_line)
+        if device_name and is_phone_device(device_name):
+            phones.add(device_name)
+    
+    return phones
+
+def device_monitor():
+    """Background thread function to monitor USB devices"""
+    global connected_devices, device_monitor_running
+    
+    print("USB Device Monitor started")
+    
+    # Get initial state
+    connected_devices = get_connected_phones()
+    if connected_devices:
+        print(f"Initial connected phones: {connected_devices}")
+        # Log initial connections
+        for device in connected_devices:
+            try:
+                log_device_event(True, device)
+                print(f"Auto-logged connection: {device}")
+            except Exception as e:
+                print(f"Error logging initial connection for {device}: {e}")
+    
+    while device_monitor_running:
+        try:
+            time.sleep(USB_CHECK_INTERVAL)
+            
+            if not device_monitor_running:
+                break
+                
+            current_devices = get_connected_phones()
+            
+            # Check for newly connected devices
+            new_devices = current_devices - connected_devices
+            for device in new_devices:
+                try:
+                    log_device_event(True, device)
+                    print(f"Auto-detected connection: {device}")
+                except Exception as e:
+                    print(f"Error logging connection for {device}: {e}")
+            
+            # Check for disconnected devices
+            removed_devices = connected_devices - current_devices
+            for device in removed_devices:
+                try:
+                    log_device_event(False, device)
+                    print(f"Auto-detected disconnection: {device}")
+                except Exception as e:
+                    print(f"Error logging disconnection for {device}: {e}")
+            
+            # Update connected devices
+            connected_devices = current_devices
+            
+        except Exception as e:
+            print(f"Error in device monitor: {e}")
+            # Continue monitoring even if there's an error
+            time.sleep(USB_CHECK_INTERVAL)
+    
+    print("USB Device Monitor stopped")
+
+def start_device_monitor():
+    """Start the USB device monitoring thread"""
+    global device_monitor_running, device_monitor_thread
+    
+    if device_monitor_running:
+        print("Device monitor is already running")
+        return
+    
+    device_monitor_running = True
+    device_monitor_thread = threading.Thread(target=device_monitor, daemon=True)
+    device_monitor_thread.start()
+    print("Device monitor thread started")
+
+def stop_device_monitor():
+    """Stop the USB device monitoring thread"""
+    global device_monitor_running, device_monitor_thread
+    
+    if not device_monitor_running:
+        print("Device monitor is not running")
+        return
+    
+    print("Stopping device monitor...")
+    device_monitor_running = False
+    
+    if device_monitor_thread and device_monitor_thread.is_alive():
+        device_monitor_thread.join(timeout=5)
+    
+    print("Device monitor stopped")
+
 @app.route('/api/debug/events')
 def debug_events():
     """Debug endpoint to see raw events and processing"""
@@ -285,6 +455,67 @@ def device_disconnected():
         return jsonify({"status": "success", "message": "Device disconnection logged"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Failed to log disconnection: {str(e)}"}), 500
+
+@app.route('/api/device/monitor/status')
+def monitor_status():
+    """Get USB device monitor status"""
+    return jsonify({
+        "monitoring": device_monitor_running,
+        "connectedDevices": list(connected_devices),
+        "checkInterval": USB_CHECK_INTERVAL,
+        "phonePatterns": PHONE_PATTERNS
+    })
+
+@app.route('/api/device/monitor/start', methods=['POST'])
+def start_monitor():
+    """Start USB device monitoring"""
+    try:
+        start_device_monitor()
+        return jsonify({
+            "status": "success",
+            "message": "Device monitoring started",
+            "monitoring": device_monitor_running
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to start monitoring: {str(e)}"
+        }), 500
+
+@app.route('/api/device/monitor/stop', methods=['POST'])
+def stop_monitor():
+    """Stop USB device monitoring"""
+    try:
+        stop_device_monitor()
+        return jsonify({
+            "status": "success",
+            "message": "Device monitoring stopped",
+            "monitoring": device_monitor_running
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to stop monitoring: {str(e)}"
+        }), 500
+
+@app.route('/api/device/scan', methods=['POST'])
+def manual_scan():
+    """Manually scan for USB devices (for testing)"""
+    try:
+        usb_devices = get_usb_devices()
+        phones = get_connected_phones()
+        
+        return jsonify({
+            "status": "success",
+            "allDevices": usb_devices,
+            "phoneDevices": list(phones),
+            "phoneCount": len(phones)
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to scan devices: {str(e)}"
+        }), 500
 
 @app.route('/api/device/stats')
 def device_stats():
@@ -472,4 +703,14 @@ def serve_react(path):
         return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8182)
+    # Start USB device monitoring when running the app
+    start_device_monitor()
+    
+    try:
+        app.run(debug=True, host='0.0.0.0', port=8182)
+    except KeyboardInterrupt:
+        print("\nShutting down...")
+        stop_device_monitor()
+    except Exception as e:
+        print(f"Error running app: {e}")
+        stop_device_monitor()
