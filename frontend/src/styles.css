@@ -477,6 +477,7 @@ body {
   flex: 1;
   justify-content: space-between;
   flex-direction: row;
+  align-items: flex-start;
 }
 
 .session-block {
@@ -485,10 +486,53 @@ body {
   gap: 0.25rem;
 }
 
+.session-block:first-child {
+  flex: 0 0 auto;
+}
+
+.session-block:last-child {
+  flex: 1;
+  text-align: right;
+}
+
 .session-date-row {
   display: flex;
   align-items: center;
   margin-bottom: 0.25rem;
+}
+
+.session-time-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-time-range {
+  font-size: 0.875rem;
+  color: #4b5563;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.session-start,
+.session-end {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.session-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.session-time {
+  font-size: 0.875rem;
+  color: #374151;
+  font-weight: 500;
 }
 
 .session-date {

@@ -40,8 +40,44 @@ const SessionCard = ({ session, index, formatDate }) => {
     return null;
   }
 
-  const durationMinutes = Math.floor(session.duration / 60);
   const points = Math.floor(session.duration); // 1 point per second
+  
+  const startDate = new Date(session.start);
+  const endDate = new Date(session.end);
+  
+  const formatDuration = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes} minutes`;
+    } else {
+      // return `${secs}s`;
+      return `${secs} seconds`;
+    }
+  };
+  
+  const formatTimeRange = () => {
+    const formatOptions = {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    };
+    
+    const startTime = startDate.toLocaleString('en-US', formatOptions);
+    const endTime = endDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    return `${startTime} - ${endTime}`;
+  };
   
   return (
     <div className="session-card">
@@ -49,17 +85,15 @@ const SessionCard = ({ session, index, formatDate }) => {
         <div className="session-info">
           <div className="session-block">
             <div className="session-duration">
-              {durationMinutes} minutes
+              {formatDuration(session.duration)}
             </div>
             <div className="session-points">
               +{points} points
             </div>
           </div>
           <div className="session-block">
-            <div className="session-date-row">
-              <span className="session-date">
-                {new Date(session.start).toLocaleDateString()}
-              </span>
+            <div className="session-time-range">
+              {formatTimeRange()}
             </div>
           </div>
         </div>
