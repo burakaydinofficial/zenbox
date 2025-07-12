@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Clock, Award, MapPin, Play, Pause } from 'lucide-react';
 import { useZenMode, useStats, useSettings, useTimeFormat, useProgress } from '../hooks/useZenboxData';
 
@@ -8,6 +8,34 @@ const HomeScreen = () => {
   const { dailyTarget } = useSettings();
   const { formatTime } = useTimeFormat();
   const { getDailyProgress, getDailyProgressWidth } = useProgress();
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = async (event) => {
+      // Check if 'f' key is pressed (and not in an input field)
+      if (event.key.toLowerCase() === 'f' && !event.target.matches('input, textarea, select')) {
+        event.preventDefault();
+        
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        } catch (err) {
+          console.error('Error toggling fullscreen:', err);
+        }
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('keydown', handleKeyPress);
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, []);
 
   return (
     <div className="home-screen">
