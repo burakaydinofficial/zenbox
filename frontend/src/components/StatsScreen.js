@@ -40,7 +40,7 @@ const WeeklyChart = ({ weeklyData }) => (
                 className="chart-bar-fill"
                 style={{ width: `${Math.min((day.zen / day.target) * 100, 100)}%` }}
               ></div>
-              <div className="chart-target-line"></div>
+              {/* <div className="chart-target-line"></div> */}
             </div>
           </div>
           <div className="chart-values">

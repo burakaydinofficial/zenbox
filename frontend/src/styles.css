@@ -32,7 +32,6 @@ body {
 
 .main-content {
   padding: 1.5rem;
-  padding-bottom: 5rem;
   flex-basis: 50%;
   flex-grow: 1;
   overflow: auto;
