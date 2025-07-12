@@ -544,34 +544,48 @@ def api_data():
 @app.route('/api/device/connected', methods=['POST'])
 def device_connected():
     try:
-        # Get optional device name from request body - backward compatible
+        # Get optional device name and ID from request body - backward compatible
         device_name = ''
+        device_id = ''
         try:
             data = request.get_json(silent=True) or {}
             device_name = data.get('deviceName', '')
+            device_id = data.get('deviceId', '')
         except:
-            # If JSON parsing fails, just use empty device name for backward compatibility
+            # If JSON parsing fails, just use empty values for backward compatibility
             device_name = ''
+            device_id = ''
         
-        log_device_event(True, device_name)
-        return jsonify({"status": "success", "message": "Device connection logged"})
+        # Only log if we should (avoid duplicates)
+        if should_log_connection(device_id, device_name):
+            log_device_event(True, device_name, device_id)
+            return jsonify({"status": "success", "message": "Device connection logged"})
+        else:
+            return jsonify({"status": "success", "message": "Device already connected, no duplicate logged"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Failed to log connection: {str(e)}"}), 500
 
 @app.route('/api/device/disconnected', methods=['POST'])
 def device_disconnected():
     try:
-        # Get optional device name from request body - backward compatible
+        # Get optional device name and ID from request body - backward compatible
         device_name = ''
+        device_id = ''
         try:
             data = request.get_json(silent=True) or {}
             device_name = data.get('deviceName', '')
+            device_id = data.get('deviceId', '')
         except:
-            # If JSON parsing fails, just use empty device name for backward compatibility
+            # If JSON parsing fails, just use empty values for backward compatibility
             device_name = ''
+            device_id = ''
         
-        log_device_event(False, device_name)
-        return jsonify({"status": "success", "message": "Device disconnection logged"})
+        # Only log if we should (device was actually connected)
+        if should_log_disconnection(device_id, device_name):
+            log_device_event(False, device_name, device_id)
+            return jsonify({"status": "success", "message": "Device disconnection logged"})
+        else:
+            return jsonify({"status": "success", "message": "Device was not connected, no disconnection logged"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Failed to log disconnection: {str(e)}"}), 500
 

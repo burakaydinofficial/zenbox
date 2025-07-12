@@ -1,19 +1,27 @@
-timestamp,isConnected,deviceName
-2025-07-06 14:20:45,True,
-2025-07-06 15:35:20,False,
-2025-07-07 13:45:20,True,
-2025-07-07 15:20:10,False,
-2025-07-07 19:30:45,True,
-2025-07-07 21:45:30,False,
-2025-07-08 12:15:30,True,
-2025-07-08 13:55:15,False,
-2025-07-09 14:45:20,True,
-2025-07-09 16:15:45,False,
-2025-07-10 08:15:45,True,
-2025-07-10 09:45:20,False,
-2025-07-10 19:15:30,True,
-2025-07-10 21:30:15,False,
-2025-07-11 12:45:30,True,
-2025-07-11 14:30:15,False,
-2025-07-12 08:00:30,True,
-2025-07-12 09:30:15,False,
+timestamp,isConnected,deviceName,deviceId
+2025-07-06 14:20:45,True,,
+2025-07-06 15:35:20,False,,
+2025-07-07 13:45:20,True,,
+2025-07-07 15:20:10,False,,
+2025-07-07 19:30:45,True,,
+2025-07-07 21:45:30,False,,
+2025-07-08 12:15:30,True,,
+2025-07-08 13:55:15,False,,
+2025-07-09 14:45:20,True,,
+2025-07-09 16:15:45,False,,
+2025-07-10 08:15:45,True,,
+2025-07-10 09:45:20,False,,
+2025-07-10 19:15:30,True,,
+2025-07-10 21:30:15,False,,
+2025-07-11 12:45:30,True,,
+2025-07-11 14:30:15,False,,
+2025-07-12 08:00:30,True,,
+2025-07-12 09:30:15,False,,
+2025-07-12 14:28:22,True,Test Device,test:1234
+2025-07-12 14:28:24,False,Test Device,test:1234
+2025-07-12 14:33:45,True,Google Inc. Redmi Note 10 Pro  Serial: 2371c84b,18d1:4ee7
+2025-07-12 14:33:45,True,Google Inc. Redmi Note 10 Pro  Serial: 2371c84b,18d1:4ee7
+2025-07-12 14:33:55,False,Google Inc. Redmi Note 10 Pro  Serial: 2371c84b,18d1:4ee7
+2025-07-12 14:33:55,False,Google Inc. Redmi Note 10 Pro  Serial: 2371c84b,18d1:4ee7
+2025-07-12 14:36:06,True,Google Inc. Redmi Note 10 Pro  Serial: 2371c84b,18d1:4ee7
+2025-07-12 14:36:12,False,Google Inc. Redmi Note 10 Pro  Serial: 2371c84b,18d1:4ee7
