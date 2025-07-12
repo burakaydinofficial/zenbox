@@ -264,22 +264,28 @@ def get_usb_devices():
         return []
 
 def extract_device_info(lsusb_line):
-    """Extract device name from lsusb output line"""
+    """Extract device ID and name from lsusb output line"""
     try:
         # lsusb output format: "Bus 001 Device 002: ID 1234:5678 Device Name"
-        # We want to extract the device name part after the ID
+        # We want to extract both the device ID and name
         parts = lsusb_line.split(': ID ')
         if len(parts) > 1:
-            # Get everything after "ID xxxx:xxxx "
+            # Get everything after "ID "
             device_part = parts[1]
-            # Remove the vendor:product ID and keep the description
+            # Split into ID and name parts
             id_and_name = device_part.split(' ', 1)
-            if len(id_and_name) > 1:
-                return id_and_name[1].strip()
-        return ""
+            if len(id_and_name) >= 2:
+                device_id = id_and_name[0].strip()  # e.g., "1234:5678"
+                device_name = id_and_name[1].strip()  # e.g., "Device Name"
+                return device_id, device_name
+            elif len(id_and_name) == 1:
+                # Only ID available, no name
+                device_id = id_and_name[0].strip()
+                return device_id, ""
+        return "", ""
     except Exception as e:
         print(f"Error extracting device info from '{lsusb_line}': {e}")
-        return ""
+        return "", ""
 
 def is_phone_device(device_name):
     """Check if device name matches phone patterns"""
@@ -292,16 +298,20 @@ def is_phone_device(device_name):
     return False
 
 def get_connected_phones():
-    """Get list of currently connected phone devices"""
-    phones = set()
+    """Get list of currently connected phone devices (deduplicated by device ID)"""
+    phones = {}  # Use dict to deduplicate by device ID
     usb_devices = get_usb_devices()
     
     for device_line in usb_devices:
-        device_name = extract_device_info(device_line)
+        device_id, device_name = extract_device_info(device_line)
         if device_name and is_phone_device(device_name):
-            phones.add(device_name)
+            # Use device ID as key to prevent duplicates
+            # If we already have this device ID, prefer the one with more descriptive name
+            if device_id not in phones or len(device_name) > len(phones[device_id]):
+                phones[device_id] = device_name
     
-    return phones
+    # Return set of unique device names (deduplicated)
+    return set(phones.values())
 
 def device_monitor():
     """Background thread function to monitor USB devices"""
@@ -505,9 +515,28 @@ def manual_scan():
         usb_devices = get_usb_devices()
         phones = get_connected_phones()
         
+        # Also show detailed device info for debugging
+        device_details = []
+        phone_device_ids = {}
+        
+        for device_line in usb_devices:
+            device_id, device_name = extract_device_info(device_line)
+            device_details.append({
+                "raw": device_line,
+                "id": device_id,
+                "name": device_name,
+                "isPhone": is_phone_device(device_name) if device_name else False
+            })
+            
+            if device_name and is_phone_device(device_name):
+                if device_id not in phone_device_ids or len(device_name) > len(phone_device_ids[device_id]):
+                    phone_device_ids[device_id] = device_name
+        
         return jsonify({
             "status": "success",
             "allDevices": usb_devices,
+            "deviceDetails": device_details,
+            "phoneDeviceIds": phone_device_ids,
             "phoneDevices": list(phones),
             "phoneCount": len(phones)
         })
