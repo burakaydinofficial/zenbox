@@ -70,24 +70,31 @@ const DailyStats = ({ dailyProgress, dailyTarget, zenPoints, todayPoints, format
   const { todayZenTime } = useStats();
 
   return (
-    <div className="daily-stats">
-      <div className="stat-card">
-        <div className="stat-header">
-          <Clock className="stat-icon text-green-500" size={20} />
-          <span className="stat-label">Today</span>
-        </div>
-        <div className="stat-percentage">{dailyProgress}%</div>
-        <div className="stat-value">{formatTime(todayZenTime)}</div>
-        <div className="stat-target">Target: {formatTime(dailyTarget)}</div>
+    <div>
+      <div className='home-screen-slogan-container'>
+        <span className="home-screen-slogan">
+            Every second counts!
+        </span>
       </div>
-      
-      <div className="stat-card">
-        <div className="stat-header">
-          <Award className="stat-icon text-purple-500" size={20} />
-          <span className="stat-label">Zen Points</span>
+      <div className="daily-stats">
+        <div className="stat-card">
+          <div className="stat-header">
+            <Clock className="stat-icon text-green-500" size={20} />
+            <span className="stat-label">Today</span>
+          </div>
+          <div className="stat-percentage">{dailyProgress}%</div>
+          <div className="stat-value">{formatTime(todayZenTime)}</div>
+          <div className="stat-target">Target: {formatTime(dailyTarget)}</div>
         </div>
-        <div className="stat-points">{zenPoints}</div>
-        <div className="stat-points-today">+{todayPoints} today</div>
+        
+        <div className="stat-card">
+          <div className="stat-header">
+            <Award className="stat-icon text-purple-500" size={20} />
+            <span className="stat-label">Zen Points</span>
+          </div>
+          <div className="stat-points">{zenPoints}</div>
+          <div className="stat-points-today">+{todayPoints} today</div>
+        </div>
       </div>
     </div>
   );

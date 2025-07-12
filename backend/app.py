@@ -75,8 +75,7 @@ def get_sessions_from_data(data):
     
     for entry in data:
         time = entry[0]
-        entry_connected_before_parse = entry[1]
-        entry_connected = entry_connected_before_parse.lower() == "true"
+        entry_connected = entry[1]
         parsed_time = datetime.strptime(time, "%Y-%m-%d %H:%M")
         
         if entry_connected and not connected:

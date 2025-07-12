@@ -202,6 +202,17 @@ body {
   border: 1px solid #e5e7eb;
 }
 
+.home-screen-slogan-container {
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+.home-screen-slogan {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
 .stat-header {
   display: flex;
   align-items: center;
