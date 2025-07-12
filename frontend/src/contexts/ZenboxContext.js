@@ -12,8 +12,9 @@ const initialState = {
   // Zen Mode State
   isZenMode: false,
   
-  // Settings
+  // Settings (will be loaded from backend)
   dailyTarget: 120, // minutes
+  weeklyTarget: 840, // minutes
   settings: {
     autoReminder: true,
     callFiltering: true,
@@ -21,20 +22,12 @@ const initialState = {
     zenDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
   },
   
-  // Data
+  // Data (calculated by backend)
   stats: null,
   todayZenTime: 0, // minutes
-  zenPoints: 245,
-  todayPoints: 8,
-  weeklyData: [
-    { day: 'Mon', zen: 0, target: 120 },
-    { day: 'Tue', zen: 0, target: 120 },
-    { day: 'Wed', zen: 0, target: 120 },
-    { day: 'Thu', zen: 0, target: 120 },
-    { day: 'Fri', zen: 0, target: 120 },
-    { day: 'Sat', zen: 0, target: 120 },
-    { day: 'Sun', zen: 0, target: 120 },
-  ]
+  zenPoints: 0,
+  todayPoints: 0,
+  weeklyData: []
 };
 
 // Action types
@@ -44,11 +37,10 @@ const actionTypes = {
   SET_CURRENT_SCREEN: 'SET_CURRENT_SCREEN',
   SET_ZEN_MODE: 'SET_ZEN_MODE',
   SET_DAILY_TARGET: 'SET_DAILY_TARGET',
+  SET_WEEKLY_TARGET: 'SET_WEEKLY_TARGET',
   UPDATE_SETTINGS: 'UPDATE_SETTINGS',
-  SET_STATS: 'SET_STATS',
-  SET_TODAY_ZEN_TIME: 'SET_TODAY_ZEN_TIME',
-  SET_WEEKLY_DATA: 'SET_WEEKLY_DATA',
-  UPDATE_ZEN_POINTS: 'UPDATE_ZEN_POINTS'
+  SET_STATS_DATA: 'SET_STATS_DATA',
+  SET_CONFIG_DATA: 'SET_CONFIG_DATA'
 };
 
 // Reducer
@@ -69,26 +61,33 @@ const zenboxReducer = (state, action) => {
     case actionTypes.SET_DAILY_TARGET:
       return { ...state, dailyTarget: action.payload };
     
+    case actionTypes.SET_WEEKLY_TARGET:
+      return { ...state, weeklyTarget: action.payload };
+    
     case actionTypes.UPDATE_SETTINGS:
       return { 
         ...state, 
         settings: { ...state.settings, ...action.payload } 
       };
     
-    case actionTypes.SET_STATS:
-      return { ...state, stats: action.payload };
-    
-    case actionTypes.SET_TODAY_ZEN_TIME:
-      return { ...state, todayZenTime: action.payload };
-    
-    case actionTypes.SET_WEEKLY_DATA:
-      return { ...state, weeklyData: action.payload };
-    
-    case actionTypes.UPDATE_ZEN_POINTS:
+    case actionTypes.SET_STATS_DATA:
       return { 
         ...state, 
-        zenPoints: action.payload.total,
-        todayPoints: action.payload.today 
+        stats: action.payload.stats,
+        isZenMode: action.payload.isZenMode,
+        todayZenTime: action.payload.todayZenTime,
+        zenPoints: action.payload.zenPoints,
+        todayPoints: action.payload.todayPoints,
+        weeklyData: action.payload.weeklyData,
+        dailyTarget: action.payload.dailyTarget
+      };
+    
+    case actionTypes.SET_CONFIG_DATA:
+      return {
+        ...state,
+        dailyTarget: action.payload.dailyTarget,
+        weeklyTarget: action.payload.weeklyTarget,
+        settings: action.payload.settings
       };
     
     default:
@@ -110,52 +109,19 @@ export const ZenboxProvider = ({ children }) => {
       const response = await fetch(`${API_URL}/device/stats`);
       const data = await response.json();
       
-      dispatch({ type: actionTypes.SET_STATS, payload: data });
-      
-      // Calculate today's zen time from sessions
-      const today = new Date().toDateString();
-      let todayTotal = 0;
-      
-      data.sessions.forEach(session => {
-        const sessionDate = new Date(session.start).toDateString();
-        if (sessionDate === today) {
-          todayTotal += session.duration;
+      dispatch({ 
+        type: actionTypes.SET_STATS_DATA, 
+        payload: {
+          stats: data.sessions,
+          isZenMode: data.isZenMode,
+          todayZenTime: data.todayZenTime,
+          zenPoints: data.zenPoints,
+          todayPoints: data.todayPoints,
+          weeklyData: data.weeklyData,
+          dailyTarget: data.dailyTarget
         }
       });
-      
-      dispatch({ 
-        type: actionTypes.SET_TODAY_ZEN_TIME, 
-        payload: Math.floor(todayTotal / 60) 
-      });
 
-      // Process weekly data
-      const weekly = [
-        { day: 'Mon', zen: 0, target: state.dailyTarget },
-        { day: 'Tue', zen: 0, target: state.dailyTarget },
-        { day: 'Wed', zen: 0, target: state.dailyTarget },
-        { day: 'Thu', zen: 0, target: state.dailyTarget },
-        { day: 'Fri', zen: 0, target: state.dailyTarget },
-        { day: 'Sat', zen: 0, target: state.dailyTarget },
-        { day: 'Sun', zen: 0, target: state.dailyTarget },
-      ];
-
-      // Sum up session durations by day
-      data.sessions.forEach(session => {
-        const sessionDate = new Date(session.start);
-        const dayIndex = (sessionDate.getDay() + 6) % 7; // Convert to Mon=0, Tue=1, etc.
-        weekly[dayIndex].zen += Math.floor(session.duration / 60);
-      });
-
-      dispatch({ type: actionTypes.SET_WEEKLY_DATA, payload: weekly });
-
-      // Check if currently in zen mode (has active session)
-      const lastSession = data.sessions[data.sessions.length - 1];
-      dispatch({ 
-        type: actionTypes.SET_ZEN_MODE, 
-        payload: lastSession && !lastSession.end 
-      });
-
-      dispatch({ type: actionTypes.SET_ERROR, payload: null });
     } catch (error) {
       console.error('Error fetching stats:', error);
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message });
@@ -164,23 +130,75 @@ export const ZenboxProvider = ({ children }) => {
     }
   };
 
+  const fetchConfig = async () => {
+    try {
+      const response = await fetch(`${API_URL}/user/config`);
+      const data = await response.json();
+      
+      dispatch({ 
+        type: actionTypes.SET_CONFIG_DATA, 
+        payload: {
+          dailyTarget: data.dailyTarget,
+          weeklyTarget: data.weeklyTarget,
+          settings: data.settings
+        }
+      });
+
+    } catch (error) {
+      console.error('Error fetching config:', error);
+      dispatch({ type: actionTypes.SET_ERROR, payload: error.message });
+    }
+  };
+
+  const updateDailyTarget = async (newTarget) => {
+    try {
+      const response = await fetch(`${API_URL}/user/daily-target`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dailyTarget: newTarget })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        dispatch({ type: actionTypes.SET_DAILY_TARGET, payload: data.dailyTarget });
+        dispatch({ type: actionTypes.SET_WEEKLY_TARGET, payload: data.weeklyTarget });
+        // Refresh stats to get updated weekly data
+        fetchStats();
+      }
+    } catch (error) {
+      console.error('Error updating daily target:', error);
+      dispatch({ type: actionTypes.SET_ERROR, payload: error.message });
+    }
+  };
+
+  const updateUserSettings = async (newSettings) => {
+    try {
+      const response = await fetch(`${API_URL}/user/config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ settings: newSettings })
+      });
+
+      if (response.ok) {
+        dispatch({ type: actionTypes.UPDATE_SETTINGS, payload: newSettings });
+      }
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      dispatch({ type: actionTypes.SET_ERROR, payload: error.message });
+    }
+  };
+
   const toggleZenMode = async () => {
     try {
       const endpoint = state.isZenMode ? '/device/disconnected' : '/device/connected';
       await fetch(`${API_URL}${endpoint}`, { method: 'POST' });
       
-      dispatch({ type: actionTypes.SET_ZEN_MODE, payload: !state.isZenMode });
-      
-      // Update zen points when toggling
-      if (!state.isZenMode) {
-        dispatch({ 
-          type: actionTypes.UPDATE_ZEN_POINTS, 
-          payload: { 
-            total: state.zenPoints + 1, 
-            today: state.todayPoints + 1 
-          } 
-        });
-      }
+      // Let the next fetchStats call update the zen mode state
+      setTimeout(fetchStats, 500);
     } catch (error) {
       console.error('Error toggling zen mode:', error);
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message });
@@ -192,18 +210,16 @@ export const ZenboxProvider = ({ children }) => {
     setCurrentScreen: (screen) => 
       dispatch({ type: actionTypes.SET_CURRENT_SCREEN, payload: screen }),
     
-    setDailyTarget: (target) => 
-      dispatch({ type: actionTypes.SET_DAILY_TARGET, payload: target }),
-    
-    updateSettings: (newSettings) => 
-      dispatch({ type: actionTypes.UPDATE_SETTINGS, payload: newSettings }),
-    
+    setDailyTarget: updateDailyTarget,
+    updateSettings: updateUserSettings,
     toggleZenMode,
-    fetchStats
+    fetchStats,
+    fetchConfig
   };
 
-  // Auto-fetch stats every 5 seconds
+  // Auto-fetch config and stats on mount, then stats every 5 seconds
   useEffect(() => {
+    fetchConfig();
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);

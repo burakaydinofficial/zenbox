@@ -1,0 +1,15 @@
+{
+  "weeklyTarget": 840,
+  "settings": {
+    "autoReminder": true,
+    "callFiltering": true,
+    "zenHours": "20:00-22:00",
+    "zenDays": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday"
+    ]
+  }
+}
