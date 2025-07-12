@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { Home, BarChart3, Settings, Clock, Phone, Gift, Award, Bell, MapPin, Play, Pause, Target } from 'lucide-react';
 import './styles.css';
 
 const API_URL = 'http://localhost:8182/api';
