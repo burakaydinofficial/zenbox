@@ -495,54 +495,11 @@ body {
   text-align: right;
 }
 
-.session-date-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 0.25rem;
-}
-
-.session-time-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
 .session-time-range {
   font-size: 0.875rem;
   color: #4b5563;
   font-weight: 500;
   line-height: 1.25;
-}
-
-.session-start,
-.session-end {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.session-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.session-time {
-  font-size: 0.875rem;
-  color: #374151;
-  font-weight: 500;
-}
-
-.session-date {
-  font-size: 0.875rem;
-  color: #4b5563;
-  margin-right: 0.5rem;
-}
-
-.session-star {
-  color: #eab308;
 }
 
 .session-duration {
@@ -554,19 +511,6 @@ body {
 .session-points {
   font-size: 0.875rem;
   color: #7c3aed;
-}
-
-.session-favorite-btn {
-  padding: 0.5rem;
-  border-radius: 9999px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.session-favorite-btn:hover {
-  background-color: #f3f4f6;
 }
 
 .empty-sessions {
@@ -651,8 +595,6 @@ body {
 .target-value {
   font-size: 0.875rem;
   color: #4b5563;
-  /* flex-basis: 4rem; */
-  /* Adjusted to fit the new design */
 }
 
 /* Feature Toggles */
@@ -802,24 +744,6 @@ body {
 
 .donation-button:hover {
   background-color: #db2777;
-}
-
-/* Loading States */
-.loading-screen {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 50vh;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto;
 }
 
 /* Animations */

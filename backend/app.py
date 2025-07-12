@@ -14,8 +14,14 @@ USER_CONFIG_FILE = 'user_config.json'
 
 def init_events_file():
     if not os.path.exists(DEVICE_EVENTS_FILE):
-        df = pd.DataFrame(columns=['timestamp', 'isConnected'])
+        df = pd.DataFrame(columns=['timestamp', 'isConnected', 'deviceName'])
         df.to_csv(DEVICE_EVENTS_FILE, index=False)
+    else:
+        # Check if deviceName column exists, add if missing for backward compatibility
+        df = pd.read_csv(DEVICE_EVENTS_FILE)
+        if 'deviceName' not in df.columns:
+            df['deviceName'] = ''  # Add empty device name for existing records
+            df.to_csv(DEVICE_EVENTS_FILE, index=False)
 
 def init_user_config():
     default_config = {
@@ -81,6 +87,9 @@ def get_sessions_from_data(data):
         else:
             entry_connected_str = str(entry[1]).lower()
             entry_connected = entry_connected_str == "true"
+        
+        # Handle optional device name (3rd column) - backwards compatible
+        device_name = entry[2] if len(entry) > 2 else ""
         
         # Try to parse with seconds first, fallback to minutes only
         try:
@@ -195,10 +204,11 @@ def is_currently_in_zen_mode(sessions, data):
     # If the last event was a disconnection, user is NOT in zen mode
     return last_connected
 
-def log_device_event(is_connected):
+def log_device_event(is_connected, device_name=""):
     try:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        df = pd.DataFrame([[timestamp, str(is_connected)]], columns=['timestamp', 'isConnected'])
+        df = pd.DataFrame([[timestamp, str(is_connected), device_name]], 
+                         columns=['timestamp', 'isConnected', 'deviceName'])
         if os.path.exists(DEVICE_EVENTS_FILE):
             df.to_csv(DEVICE_EVENTS_FILE, mode='a', header=False, index=False)
         else:
@@ -245,7 +255,16 @@ def api_data():
 @app.route('/api/device/connected', methods=['POST'])
 def device_connected():
     try:
-        log_device_event(True)
+        # Get optional device name from request body - backward compatible
+        device_name = ''
+        try:
+            data = request.get_json(silent=True) or {}
+            device_name = data.get('deviceName', '')
+        except:
+            # If JSON parsing fails, just use empty device name for backward compatibility
+            device_name = ''
+        
+        log_device_event(True, device_name)
         return jsonify({"status": "success", "message": "Device connection logged"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Failed to log connection: {str(e)}"}), 500
@@ -253,7 +272,16 @@ def device_connected():
 @app.route('/api/device/disconnected', methods=['POST'])
 def device_disconnected():
     try:
-        log_device_event(False)
+        # Get optional device name from request body - backward compatible
+        device_name = ''
+        try:
+            data = request.get_json(silent=True) or {}
+            device_name = data.get('deviceName', '')
+        except:
+            # If JSON parsing fails, just use empty device name for backward compatibility
+            device_name = ''
+        
+        log_device_event(False, device_name)
         return jsonify({"status": "success", "message": "Device disconnection logged"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Failed to log disconnection: {str(e)}"}), 500
