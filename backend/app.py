@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 import pandas as pd
 import os
@@ -18,7 +18,7 @@ def init_events_file():
 init_events_file()
 
 def get_data():
-    df = pd.read_csv('device_logs.csv')
+    df = pd.read_csv(DEVICE_EVENTS_FILE)
     return df.to_dict(orient='records')
 
 def aggregate(data):
@@ -96,4 +96,4 @@ def serve_react(path):
         return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8182)

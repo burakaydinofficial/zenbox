@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import './styles.css';
 
+const API_URL = 'http://localhost:8182/api';
+
 function CurrentStatus({ lastSession }) {
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -136,7 +138,7 @@ function App() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/device/stats');
+        const response = await fetch(API_URL + '/device/stats');
         const data = await response.json();
         setStats(data);
 
