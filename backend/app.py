@@ -34,7 +34,8 @@ PHONE_PATTERNS = [
 ]
 
 # Global variables for device monitoring
-connected_devices = set()
+connected_device_ids = set()  # Track by device IDs instead of names
+connected_device_names = {}  # device_id -> device_name mapping for disconnection logging
 device_monitor_running = False
 device_monitor_thread = None
 
@@ -298,38 +299,40 @@ def is_phone_device(device_name):
     return False
 
 def get_connected_phones():
-    """Get list of currently connected phone devices (deduplicated by device ID)"""
-    phones = {}  # Use dict to deduplicate by device ID
+    """Get dict of currently connected phone devices (deduplicated by device ID)"""
+    phones = {}  # device_id -> device_name mapping
     usb_devices = get_usb_devices()
     
     for device_line in usb_devices:
         device_id, device_name = extract_device_info(device_line)
-        if device_name and is_phone_device(device_name):
+        if device_id and device_name and is_phone_device(device_name):
             # Use device ID as key to prevent duplicates
             # If we already have this device ID, prefer the one with more descriptive name
             if device_id not in phones or len(device_name) > len(phones[device_id]):
                 phones[device_id] = device_name
     
-    # Return set of unique device names (deduplicated)
-    return set(phones.values())
+    return phones
 
 def device_monitor():
     """Background thread function to monitor USB devices"""
-    global connected_devices, device_monitor_running
+    global connected_device_ids, connected_device_names, device_monitor_running
     
     print("USB Device Monitor started")
     
     # Get initial state
-    connected_devices = get_connected_phones()
-    if connected_devices:
-        print(f"Initial connected phones: {connected_devices}")
-        # Log initial connections
-        for device in connected_devices:
+    current_phones = get_connected_phones()
+    connected_device_ids = set(current_phones.keys())
+    connected_device_names = current_phones.copy()
+    
+    if current_phones:
+        print(f"Initial connected phones: {current_phones}")
+        # Log initial connections (only once per device ID)
+        for device_id, device_name in current_phones.items():
             try:
-                log_device_event(True, device)
-                print(f"Auto-logged connection: {device}")
+                log_device_event(True, device_name)
+                print(f"Auto-logged initial connection: {device_name} (ID: {device_id})")
             except Exception as e:
-                print(f"Error logging initial connection for {device}: {e}")
+                print(f"Error logging initial connection for {device_name}: {e}")
     
     while device_monitor_running:
         try:
@@ -338,28 +341,33 @@ def device_monitor():
             if not device_monitor_running:
                 break
                 
-            current_devices = get_connected_phones()
+            current_phones = get_connected_phones()
+            current_device_ids = set(current_phones.keys())
             
-            # Check for newly connected devices
-            new_devices = current_devices - connected_devices
-            for device in new_devices:
+            # Check for newly connected devices (by device ID)
+            new_device_ids = current_device_ids - connected_device_ids
+            for device_id in new_device_ids:
+                device_name = current_phones[device_id]
                 try:
-                    log_device_event(True, device)
-                    print(f"Auto-detected connection: {device}")
+                    log_device_event(True, device_name)
+                    print(f"Auto-detected connection: {device_name} (ID: {device_id})")
                 except Exception as e:
-                    print(f"Error logging connection for {device}: {e}")
+                    print(f"Error logging connection for {device_name}: {e}")
             
-            # Check for disconnected devices
-            removed_devices = connected_devices - current_devices
-            for device in removed_devices:
+            # Check for disconnected devices (by device ID)
+            removed_device_ids = connected_device_ids - current_device_ids
+            for device_id in removed_device_ids:
+                # Use the stored device name for proper logging
+                device_name = connected_device_names.get(device_id, f"Device ID: {device_id}")
                 try:
-                    log_device_event(False, device)
-                    print(f"Auto-detected disconnection: {device}")
+                    log_device_event(False, device_name)
+                    print(f"Auto-detected disconnection: {device_name} (ID: {device_id})")
                 except Exception as e:
-                    print(f"Error logging disconnection for {device}: {e}")
+                    print(f"Error logging disconnection for {device_name}: {e}")
             
-            # Update connected devices
-            connected_devices = current_devices
+            # Update connected device state
+            connected_device_ids = current_device_ids
+            connected_device_names = current_phones.copy()
             
         except Exception as e:
             print(f"Error in device monitor: {e}")
@@ -471,7 +479,9 @@ def monitor_status():
     """Get USB device monitor status"""
     return jsonify({
         "monitoring": device_monitor_running,
-        "connectedDevices": list(connected_devices),
+        "connectedDevices": list(connected_device_names.values()),
+        "connectedDeviceIds": list(connected_device_ids),
+        "deviceMapping": connected_device_names,
         "checkInterval": USB_CHECK_INTERVAL,
         "phonePatterns": PHONE_PATTERNS
     })
@@ -517,7 +527,6 @@ def manual_scan():
         
         # Also show detailed device info for debugging
         device_details = []
-        phone_device_ids = {}
         
         for device_line in usb_devices:
             device_id, device_name = extract_device_info(device_line)
@@ -527,17 +536,13 @@ def manual_scan():
                 "name": device_name,
                 "isPhone": is_phone_device(device_name) if device_name else False
             })
-            
-            if device_name and is_phone_device(device_name):
-                if device_id not in phone_device_ids or len(device_name) > len(phone_device_ids[device_id]):
-                    phone_device_ids[device_id] = device_name
         
         return jsonify({
             "status": "success",
             "allDevices": usb_devices,
             "deviceDetails": device_details,
-            "phoneDeviceIds": phone_device_ids,
-            "phoneDevices": list(phones),
+            "phoneDeviceMapping": phones,
+            "phoneDevices": list(phones.values()),
             "phoneCount": len(phones)
         })
     except Exception as e:
