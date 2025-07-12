@@ -133,7 +133,7 @@ const DonationSection = () => (
       <h3 className="donation-title">Zen Donation</h3>
     </div>
     <p className="donation-text">
-      Gift your Zen points to others
+      Gift your Zen points for a good cause!
     </p>
     <button className="donation-button">
       Donate
