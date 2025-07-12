@@ -470,11 +470,19 @@ body {
 .session-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
 }
 
 .session-info {
+  display: flex;
   flex: 1;
+  justify-content: space-between;
+  flex-direction: row;
+}
+
+.session-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .session-date-row {

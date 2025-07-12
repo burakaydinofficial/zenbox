@@ -5,7 +5,7 @@ const SessionsScreen = () => {
   const { stats } = useStats();
   const { formatDate } = useTimeFormat();
 
-  if (!stats || !stats.sessions.length) {
+  if (!stats || !Array.isArray(stats) || stats.length === 0) {
     return (
       <div className="sessions-screen">
         <h2 className="sessions-title">Zen Sessions</h2>
@@ -21,7 +21,7 @@ const SessionsScreen = () => {
       <h2 className="sessions-title">Zen Sessions</h2>
       
       <div className="sessions-list">
-        {stats.sessions.slice(-10).reverse().map((session, index) => (
+        {stats.slice(-10).reverse().map((session, index) => (
           <SessionCard 
             key={index}
             session={session}
@@ -34,28 +34,38 @@ const SessionsScreen = () => {
   );
 };
 
-const SessionCard = ({ session, index, formatDate }) => (
-  <div className="session-card">
-    <div className="session-content">
-      <div className="session-info">
-        <div className="session-date-row">
-          <span className="session-date">
-            {new Date(session.start).toLocaleDateString()}
-          </span>
-          {index < 3 && <span className="session-star">⭐</span>}
-        </div>
-        <div className="session-duration">
-          {Math.floor(session.duration / 60)} minutes
-        </div>
-        <div className="session-points">
-          +{Math.floor(session.duration / 60 / 10)} points
+const SessionCard = ({ session, index, formatDate }) => {
+  // Handle missing session data
+  if (!session || !session.start || !session.duration) {
+    return null;
+  }
+
+  const durationMinutes = Math.floor(session.duration / 60);
+  const points = Math.floor(session.duration); // 1 point per second
+  
+  return (
+    <div className="session-card">
+      <div className="session-content">
+        <div className="session-info">
+          <div className="session-block">
+            <div className="session-duration">
+              {durationMinutes} minutes
+            </div>
+            <div className="session-points">
+              +{points} points
+            </div>
+          </div>
+          <div className="session-block">
+            <div className="session-date-row">
+              <span className="session-date">
+                {new Date(session.start).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
-      <button className="session-favorite-btn">
-        {index < 3 ? '⭐' : '☆'}
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 export default SessionsScreen;
