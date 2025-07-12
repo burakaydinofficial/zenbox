@@ -30,10 +30,10 @@ const ZenboxApp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="max-w-md mx-auto bg-white min-h-screen shadow-xl">
+    <div className="app-container">
+      <div className="app-wrapper">
         {/* Main Content */}
-        <div className="p-6 pb-20">
+        <div className="main-content">
           {renderCurrentScreen()}
         </div>
         

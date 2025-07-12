@@ -13,18 +13,16 @@ const Navigation = () => {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2">
-      <div className="flex justify-around items-center">
+    <div className="navigation">
+      <div className="navigation-container">
         {navItems.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             onClick={() => setCurrentScreen(id)}
-            className={`flex flex-col items-center p-2 rounded-lg transition-all ${
-              currentScreen === id ? 'text-blue-500 bg-blue-50' : 'text-gray-500'
-            }`}
+            className={`nav-button ${currentScreen === id ? 'active' : ''}`}
           >
             <Icon size={20} />
-            <span className="text-xs mt-1">{label}</span>
+            <span className="nav-button-label">{label}</span>
           </button>
         ))}
       </div>

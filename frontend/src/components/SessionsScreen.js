@@ -7,20 +7,20 @@ const SessionsScreen = () => {
 
   if (!stats || !stats.sessions.length) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-xl font-bold text-gray-800">Zen Sessions</h2>
-        <div className="bg-white rounded-xl p-6 border border-gray-200 text-center">
-          <p className="text-gray-500">No zen sessions yet. Start your first session!</p>
+      <div className="sessions-screen">
+        <h2 className="sessions-title">Zen Sessions</h2>
+        <div className="empty-sessions">
+          <p className="empty-sessions-text">No zen sessions yet. Start your first session!</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-800">Zen Sessions</h2>
+    <div className="sessions-screen">
+      <h2 className="sessions-title">Zen Sessions</h2>
       
-      <div className="space-y-3">
+      <div className="sessions-list">
         {stats.sessions.slice(-10).reverse().map((session, index) => (
           <SessionCard 
             key={index}
@@ -35,23 +35,23 @@ const SessionsScreen = () => {
 };
 
 const SessionCard = ({ session, index, formatDate }) => (
-  <div className="bg-white rounded-xl p-4 border border-gray-200">
-    <div className="flex items-center justify-between">
-      <div className="flex-1">
-        <div className="flex items-center">
-          <span className="text-sm text-gray-600 mr-2">
+  <div className="session-card">
+    <div className="session-content">
+      <div className="session-info">
+        <div className="session-date-row">
+          <span className="session-date">
             {new Date(session.start).toLocaleDateString()}
           </span>
-          {index < 3 && <span className="text-yellow-500">⭐</span>}
+          {index < 3 && <span className="session-star">⭐</span>}
         </div>
-        <div className="text-lg font-semibold text-gray-800">
+        <div className="session-duration">
           {Math.floor(session.duration / 60)} minutes
         </div>
-        <div className="text-sm text-purple-600">
+        <div className="session-points">
           +{Math.floor(session.duration / 60 / 10)} points
         </div>
       </div>
-      <button className="p-2 rounded-full hover:bg-gray-100">
+      <button className="session-favorite-btn">
         {index < 3 ? '⭐' : '☆'}
       </button>
     </div>

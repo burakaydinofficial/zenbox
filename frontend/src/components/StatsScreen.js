@@ -8,8 +8,8 @@ const StatsScreen = () => {
   const { getWeeklyTotal, getWeeklyAverage } = useProgress();
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-800">Weekly Statistics</h2>
+    <div className="stats-screen">
+      <h2 className="stats-title">Weekly Statistics</h2>
       
       {/* Weekly Chart */}
       <WeeklyChart weeklyData={weeklyData} />
@@ -25,25 +25,25 @@ const StatsScreen = () => {
 };
 
 const WeeklyChart = ({ weeklyData }) => (
-  <div className="bg-white rounded-xl p-4 border border-gray-200">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="font-semibold text-gray-800">Zen Times</h3>
+  <div className="weekly-chart">
+    <div className="chart-header">
+      <h3 className="chart-title">Zen Times</h3>
       <Target className="text-blue-500" size={20} />
     </div>
-    <div className="space-y-3">
+    <div className="chart-rows">
       {weeklyData.map((day, index) => (
-        <div key={index} className="flex items-center">
-          <div className="w-8 text-xs text-gray-600">{day.day}</div>
-          <div className="flex-1 mx-3">
-            <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden">
+        <div key={index} className="chart-row">
+          <div className="chart-day">{day.day}</div>
+          <div className="chart-bar-container">
+            <div className="chart-bar">
               <div 
-                className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-400 to-purple-400 rounded-full transition-all duration-500"
+                className="chart-bar-fill"
                 style={{ width: `${Math.min((day.zen / day.target) * 100, 100)}%` }}
               ></div>
-              <div className="absolute top-0 right-0 w-0.5 h-full bg-red-400 opacity-50"></div>
+              <div className="chart-target-line"></div>
             </div>
           </div>
-          <div className="text-xs text-gray-600 w-16">
+          <div className="chart-values">
             {Math.round((day.zen / day.target) * 100)}% / {day.zen}min
           </div>
         </div>
@@ -53,16 +53,16 @@ const WeeklyChart = ({ weeklyData }) => (
 );
 
 const WeeklySummary = ({ weeklyTotal, weeklyAverage, formatTime }) => (
-  <div className="grid grid-cols-2 gap-4">
-    <div className="bg-white rounded-xl p-4 border border-gray-200">
-      <h3 className="font-semibold text-gray-800 mb-2">Weekly Total</h3>
-      <div className="text-2xl font-bold text-blue-600">
+  <div className="weekly-summary">
+    <div className="summary-card">
+      <h3 className="summary-title">Weekly Total</h3>
+      <div className="summary-value total">
         {formatTime(weeklyTotal)}
       </div>
     </div>
-    <div className="bg-white rounded-xl p-4 border border-gray-200">
-      <h3 className="font-semibold text-gray-800 mb-2">Average</h3>
-      <div className="text-2xl font-bold text-purple-600">
+    <div className="summary-card">
+      <h3 className="summary-title">Average</h3>
+      <div className="summary-value average">
         {formatTime(weeklyAverage)}
       </div>
     </div>
