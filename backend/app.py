@@ -75,8 +75,21 @@ def get_sessions_from_data(data):
     
     for entry in data:
         time = entry[0]
-        entry_connected = entry[1]
-        parsed_time = datetime.strptime(time, "%Y-%m-%d %H:%M")
+        # Handle both boolean and string types
+        if isinstance(entry[1], bool):
+            entry_connected = entry[1]
+        else:
+            entry_connected_str = str(entry[1]).lower()
+            entry_connected = entry_connected_str == "true"
+        
+        # Try to parse with seconds first, fallback to minutes only
+        try:
+            parsed_time = datetime.strptime(time, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            try:
+                parsed_time = datetime.strptime(time, "%Y-%m-%d %H:%M")
+            except ValueError:
+                continue  # Skip invalid timestamps
         
         if entry_connected and not connected:
             connected = True
@@ -91,6 +104,18 @@ def get_sessions_from_data(data):
                 })
             connected = False
             connected_timestamp = None
+    
+    # Handle case where session is still active (last event was connection)
+    if connected and connected_timestamp:
+        # Create an ongoing session with current time as end
+        current_time = datetime.now()
+        duration = (current_time - connected_timestamp).total_seconds()
+        sessions.append({
+            "start": connected_timestamp.isoformat(),
+            "end": current_time.isoformat(),
+            "duration": duration,
+            "isActive": True  # Mark as currently active session
+        })
     
     return sessions
 
@@ -152,28 +177,66 @@ def calculate_weekly_data(sessions, daily_target):
     
     return weekly_data
 
-def is_currently_in_zen_mode(sessions):
+def is_currently_in_zen_mode(sessions, data):
     """Check if user is currently in zen mode (has an active session)"""
-    if not sessions:
+    if not data:
         return False
     
-    # Check if the last session doesn't have an end time or is very recent
-    last_session = sessions[-1]
-    if "end" not in last_session:
-        return True
+    # Check the last event in the raw data
+    last_event = data[-1]
+    # Handle both boolean and string types
+    if isinstance(last_event[1], bool):
+        last_connected = last_event[1]
+    else:
+        last_connected_str = str(last_event[1]).lower()
+        last_connected = last_connected_str == "true"
     
-    # Check if last disconnection was very recent (within 1 minute)
-    last_end = datetime.fromisoformat(last_session["end"])
-    time_diff = datetime.now() - last_end
-    return time_diff.total_seconds() < 60
+    # If the last event was a connection, user is in zen mode
+    # If the last event was a disconnection, user is NOT in zen mode
+    return last_connected
 
 def log_device_event(is_connected):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    df = pd.DataFrame([[timestamp, str(is_connected)]], columns=['timestamp', 'isConnected'])
-    if os.path.exists(DEVICE_EVENTS_FILE):
-        df.to_csv(DEVICE_EVENTS_FILE, mode='a', header=False, index=False)
-    else:
-        df.to_csv(DEVICE_EVENTS_FILE, index=False)
+    try:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        df = pd.DataFrame([[timestamp, str(is_connected)]], columns=['timestamp', 'isConnected'])
+        if os.path.exists(DEVICE_EVENTS_FILE):
+            df.to_csv(DEVICE_EVENTS_FILE, mode='a', header=False, index=False)
+        else:
+            df.to_csv(DEVICE_EVENTS_FILE, index=False)
+    except Exception as e:
+        print(f"Error logging device event: {e}")
+        raise
+
+@app.route('/api/debug/events')
+def debug_events():
+    """Debug endpoint to see raw events and processing"""
+    try:
+        if not os.path.exists(DEVICE_EVENTS_FILE):
+            return jsonify({"events": [], "message": "No events file"})
+        
+        df = pd.read_csv(DEVICE_EVENTS_FILE)
+        if df.empty:
+            return jsonify({"events": [], "message": "No events"})
+        
+        data = df.values.tolist()
+        sessions = get_sessions_from_data(data)
+        
+        # Get last few events for debugging
+        last_events = data[-5:] if len(data) >= 5 else data
+        
+        return jsonify({
+            "lastEvents": last_events,
+            "sessions": sessions,
+            "isZenMode": is_currently_in_zen_mode(sessions, data),
+            "totalEvents": len(data)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Error in debug endpoint: {str(e)}",
+            "events": [],
+            "message": "Error processing events"
+        }), 500
 
 @app.route('/api/data')
 def api_data():
@@ -181,65 +244,87 @@ def api_data():
 
 @app.route('/api/device/connected', methods=['POST'])
 def device_connected():
-    log_device_event(True)
-    return jsonify({"status": "success", "message": "Device connection logged"})
+    try:
+        log_device_event(True)
+        return jsonify({"status": "success", "message": "Device connection logged"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to log connection: {str(e)}"}), 500
 
 @app.route('/api/device/disconnected', methods=['POST'])
 def device_disconnected():
-    log_device_event(False)
-    return jsonify({"status": "success", "message": "Device disconnection logged"})
+    try:
+        log_device_event(False)
+        return jsonify({"status": "success", "message": "Device disconnection logged"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to log disconnection: {str(e)}"}), 500
 
 @app.route('/api/device/stats')
 def device_stats():
-    if not os.path.exists(DEVICE_EVENTS_FILE):
+    try:
+        if not os.path.exists(DEVICE_EVENTS_FILE):
+            return jsonify({
+                "total_time": 0,
+                "sessions": [],
+                "isZenMode": False,
+                "todayZenTime": 0,
+                "zenPoints": 0,
+                "todayPoints": 0,
+                "weeklyData": [],
+                "dailyTarget": 120
+            })
+        
+        df = pd.read_csv(DEVICE_EVENTS_FILE)
+        if df.empty:
+            return jsonify({
+                "total_time": 0,
+                "sessions": [],
+                "isZenMode": False,
+                "todayZenTime": 0,
+                "zenPoints": 0,
+                "todayPoints": 0,
+                "weeklyData": [],
+                "dailyTarget": 120
+            })
+        
+        # Get user config for calculations
+        config = load_user_config()
+        daily_target = config.get("dailyTarget", 120)
+        
+        # Process sessions
+        data = df.values.tolist()
+        sessions = get_sessions_from_data(data)
+        
+        # Calculate derived values
+        total_time = sum(session["duration"] for session in sessions)
+        today_zen_time = calculate_today_zen_time(sessions)
+        zen_points = calculate_zen_points(sessions)
+        today_points = calculate_today_points(sessions)
+        weekly_data = calculate_weekly_data(sessions, daily_target)
+        is_zen_mode = is_currently_in_zen_mode(sessions, data)
+        
         return jsonify({
+            "total_time": total_time,
+            "sessions": sessions,
+            "isZenMode": is_zen_mode,
+            "todayZenTime": today_zen_time,
+            "zenPoints": zen_points,
+            "todayPoints": today_points,
+            "weeklyData": weekly_data,
+            "dailyTarget": daily_target
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Error processing device stats: {str(e)}",
             "total_time": 0,
             "sessions": [],
             "isZenMode": False,
             "todayZenTime": 0,
             "zenPoints": 0,
             "todayPoints": 0,
-            "weeklyData": []
-        })
-    
-    df = pd.read_csv(DEVICE_EVENTS_FILE)
-    if df.empty:
-        return jsonify({
-            "total_time": 0,
-            "sessions": [],
-            "isZenMode": False,
-            "todayZenTime": 0,
-            "zenPoints": 0,
-            "todayPoints": 0,
-            "weeklyData": []
-        })
-    
-    # Get user config for calculations
-    config = load_user_config()
-    daily_target = config["dailyTarget"]
-    
-    # Process sessions
-    data = df.values.tolist()
-    sessions = get_sessions_from_data(data)
-    
-    # Calculate derived values
-    total_time = sum(session["duration"] for session in sessions)
-    today_zen_time = calculate_today_zen_time(sessions)
-    zen_points = calculate_zen_points(sessions)
-    today_points = calculate_today_points(sessions)
-    weekly_data = calculate_weekly_data(sessions, daily_target)
-    is_zen_mode = is_currently_in_zen_mode(sessions)
-    
-    return jsonify({
-        "total_time": total_time,
-        "sessions": sessions,
-        "isZenMode": is_zen_mode,
-        "todayZenTime": today_zen_time,
-        "zenPoints": zen_points,
-        "todayPoints": today_points,
-        "weeklyData": weekly_data,
-        "dailyTarget": daily_target
-    })
+            "weeklyData": [],
+            "dailyTarget": 120
+        }), 500
 
 @app.route('/api/user/config', methods=['GET'])
 def get_user_config():
@@ -256,13 +341,30 @@ def get_user_config():
 def update_user_config():
     try:
         new_config = request.get_json()
+        if not new_config:
+            return jsonify({
+                "status": "error",
+                "message": "No configuration data provided"
+            }), 400
+            
         current_config = load_user_config()
         
         # Update configuration
         if "dailyTarget" in new_config:
-            current_config["dailyTarget"] = new_config["dailyTarget"]
+            daily_target = new_config["dailyTarget"]
+            if not isinstance(daily_target, (int, float)) or daily_target < 30 or daily_target > 480:
+                return jsonify({
+                    "status": "error",
+                    "message": "Daily target must be a number between 30 and 480 minutes"
+                }), 400
+            current_config["dailyTarget"] = daily_target
         
         if "settings" in new_config:
+            if not isinstance(new_config["settings"], dict):
+                return jsonify({
+                    "status": "error",
+                    "message": "Settings must be an object"
+                }), 400
             current_config["settings"].update(new_config["settings"])
         
         save_user_config(current_config)
@@ -273,22 +375,39 @@ def update_user_config():
             "config": current_config
         })
     
+    except json.JSONDecodeError:
+        return jsonify({
+            "status": "error",
+            "message": "Invalid JSON data"
+        }), 400
     except Exception as e:
         return jsonify({
             "status": "error",
-            "message": str(e)
-        }), 400
+            "message": f"Unexpected error: {str(e)}"
+        }), 500
 
 @app.route('/api/user/daily-target', methods=['PUT'])
 def update_daily_target():
     try:
         data = request.get_json()
-        daily_target = data.get("dailyTarget")
-        
-        if not daily_target or daily_target < 30 or daily_target > 480:
+        if not data:
             return jsonify({
                 "status": "error",
-                "message": "Daily target must be between 30 and 480 minutes"
+                "message": "No data provided"
+            }), 400
+            
+        daily_target = data.get("dailyTarget")
+        
+        if daily_target is None:
+            return jsonify({
+                "status": "error",
+                "message": "dailyTarget is required"
+            }), 400
+            
+        if not isinstance(daily_target, (int, float)) or daily_target < 30 or daily_target > 480:
+            return jsonify({
+                "status": "error",
+                "message": "Daily target must be a number between 30 and 480 minutes"
             }), 400
         
         # Calculate weekly target for reference
@@ -305,11 +424,16 @@ def update_daily_target():
             "weeklyTarget": weekly_target
         })
     
+    except json.JSONDecodeError:
+        return jsonify({
+            "status": "error",
+            "message": "Invalid JSON data"
+        }), 400
     except Exception as e:
         return jsonify({
             "status": "error",
-            "message": str(e)
-        }), 400
+            "message": f"Unexpected error: {str(e)}"
+        }), 500
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
