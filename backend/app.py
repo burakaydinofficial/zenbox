@@ -34,21 +34,21 @@ PHONE_PATTERNS = [
 ]
 
 # Global variables for device monitoring
-connected_device_ids = set()  # Track by device IDs instead of names
-connected_device_names = {}  # device_id -> device_name mapping for disconnection logging
 device_monitor_running = False
 device_monitor_thread = None
 
 def init_events_file():
     if not os.path.exists(DEVICE_EVENTS_FILE):
-        df = pd.DataFrame(columns=['timestamp', 'isConnected', 'deviceName'])
+        df = pd.DataFrame(columns=['timestamp', 'isConnected', 'deviceName', 'deviceId'])
         df.to_csv(DEVICE_EVENTS_FILE, index=False)
     else:
-        # Check if deviceName column exists, add if missing for backward compatibility
+        # Check if columns exist, add if missing for backward compatibility
         df = pd.read_csv(DEVICE_EVENTS_FILE)
         if 'deviceName' not in df.columns:
             df['deviceName'] = ''  # Add empty device name for existing records
-            df.to_csv(DEVICE_EVENTS_FILE, index=False)
+        if 'deviceId' not in df.columns:
+            df['deviceId'] = ''  # Add empty device ID for existing records
+        df.to_csv(DEVICE_EVENTS_FILE, index=False)
 
 def init_user_config():
     default_config = {
@@ -115,8 +115,9 @@ def get_sessions_from_data(data):
             entry_connected_str = str(entry[1]).lower()
             entry_connected = entry_connected_str == "true"
         
-        # Handle optional device name (3rd column) - backwards compatible
+        # Handle optional device name and device ID (3rd and 4th columns) - backwards compatible
         device_name = entry[2] if len(entry) > 2 else ""
+        device_id = entry[3] if len(entry) > 3 else ""
         
         # Try to parse with seconds first, fallback to minutes only
         try:
@@ -231,11 +232,84 @@ def is_currently_in_zen_mode(sessions, data):
     # If the last event was a disconnection, user is NOT in zen mode
     return last_connected
 
-def log_device_event(is_connected, device_name=""):
+def get_last_device_event(device_id, device_name=""):
+    """Get the last event for a device by ID, fallback to name if ID is empty"""
+    try:
+        if not os.path.exists(DEVICE_EVENTS_FILE):
+            return None
+        
+        df = pd.read_csv(DEVICE_EVENTS_FILE)
+        if df.empty:
+            return None
+        
+        # Add deviceId column if missing for backward compatibility
+        if 'deviceId' not in df.columns:
+            df['deviceId'] = ''
+        
+        # First try to find by device ID if provided
+        if device_id:
+            device_events = df[df['deviceId'] == device_id]
+            if not device_events.empty:
+                last_event = device_events.iloc[-1]
+                return {
+                    'timestamp': last_event['timestamp'],
+                    'isConnected': str(last_event['isConnected']).lower() == 'true',
+                    'deviceName': last_event.get('deviceName', ''),
+                    'deviceId': last_event.get('deviceId', '')
+                }
+        
+        # Fallback to device name if ID not found or not provided
+        if device_name:
+            device_events = df[df['deviceName'] == device_name]
+            if not device_events.empty:
+                last_event = device_events.iloc[-1]
+                return {
+                    'timestamp': last_event['timestamp'],
+                    'isConnected': str(last_event['isConnected']).lower() == 'true',
+                    'deviceName': last_event.get('deviceName', ''),
+                    'deviceId': last_event.get('deviceId', '')
+                }
+        
+        return None
+    except Exception as e:
+        print(f"Error getting last device event: {e}")
+        return None
+
+def should_log_connection(device_id, device_name):
+    """Check if we should log a connection event (avoid duplicates)"""
+    last_event = get_last_device_event(device_id, device_name)
+    
+    # If no previous event, log the connection
+    if not last_event:
+        return True
+    
+    # If last event was disconnection, log the connection
+    if not last_event['isConnected']:
+        return True
+    
+    # If last event was connection, don't log duplicate
+    return False
+
+def should_log_disconnection(device_id, device_name):
+    """Check if we should log a disconnection event"""
+    last_event = get_last_device_event(device_id, device_name)
+    
+    # If no previous event, don't log disconnection (nothing was connected)
+    if not last_event:
+        return False
+    
+    # If last event was connection, log the disconnection
+    if last_event['isConnected']:
+        return True
+    
+    # If last event was disconnection, don't log duplicate
+    return False
+
+def log_device_event(is_connected, device_name="", device_id=""):
     try:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        df = pd.DataFrame([[timestamp, str(is_connected), device_name]], 
-                         columns=['timestamp', 'isConnected', 'deviceName'])
+        df = pd.DataFrame([[timestamp, str(is_connected), device_name, device_id]], 
+                         columns=['timestamp', 'isConnected', 'deviceName', 'deviceId'])
         if os.path.exists(DEVICE_EVENTS_FILE):
             df.to_csv(DEVICE_EVENTS_FILE, mode='a', header=False, index=False)
         else:
@@ -313,26 +387,56 @@ def get_connected_phones():
     
     return phones
 
+def get_all_known_devices():
+    """Get all devices that have been seen before from the CSV"""
+    try:
+        if not os.path.exists(DEVICE_EVENTS_FILE):
+            return {}
+        
+        df = pd.read_csv(DEVICE_EVENTS_FILE)
+        if df.empty:
+            return {}
+        
+        # Add deviceId column if missing for backward compatibility
+        if 'deviceId' not in df.columns:
+            df['deviceId'] = ''
+        
+        known_devices = {}
+        
+        # Get all unique device IDs and their most recent names
+        for _, row in df.iterrows():
+            device_id = row.get('deviceId', '')
+            device_name = row.get('deviceName', '')
+            
+            if device_id:
+                # Use device ID as primary key
+                known_devices[device_id] = device_name
+            elif device_name:
+                # If no device ID, use device name as fallback key
+                known_devices[device_name] = device_name
+        
+        return known_devices
+    except Exception as e:
+        print(f"Error getting known devices: {e}")
+        return {}
+
 def device_monitor():
     """Background thread function to monitor USB devices"""
-    global connected_device_ids, connected_device_names, device_monitor_running
+    global device_monitor_running
     
     print("USB Device Monitor started")
     
-    # Get initial state
+    # Log initial connections if any devices are connected at startup
     current_phones = get_connected_phones()
-    connected_device_ids = set(current_phones.keys())
-    connected_device_names = current_phones.copy()
-    
     if current_phones:
         print(f"Initial connected phones: {current_phones}")
-        # Log initial connections (only once per device ID)
         for device_id, device_name in current_phones.items():
-            try:
-                log_device_event(True, device_name)
-                print(f"Auto-logged initial connection: {device_name} (ID: {device_id})")
-            except Exception as e:
-                print(f"Error logging initial connection for {device_name}: {e}")
+            if should_log_connection(device_id, device_name):
+                try:
+                    log_device_event(True, device_name, device_id)
+                    print(f"Auto-logged initial connection: {device_name} (ID: {device_id})")
+                except Exception as e:
+                    print(f"Error logging initial connection for {device_name}: {e}")
     
     while device_monitor_running:
         try:
@@ -342,32 +446,29 @@ def device_monitor():
                 break
                 
             current_phones = get_connected_phones()
-            current_device_ids = set(current_phones.keys())
             
-            # Check for newly connected devices (by device ID)
-            new_device_ids = current_device_ids - connected_device_ids
-            for device_id in new_device_ids:
-                device_name = current_phones[device_id]
-                try:
-                    log_device_event(True, device_name)
-                    print(f"Auto-detected connection: {device_name} (ID: {device_id})")
-                except Exception as e:
-                    print(f"Error logging connection for {device_name}: {e}")
+            # Get all devices that have been seen before
+            previously_seen_devices = get_all_known_devices()
             
-            # Check for disconnected devices (by device ID)
-            removed_device_ids = connected_device_ids - current_device_ids
-            for device_id in removed_device_ids:
-                # Use the stored device name for proper logging
-                device_name = connected_device_names.get(device_id, f"Device ID: {device_id}")
-                try:
-                    log_device_event(False, device_name)
-                    print(f"Auto-detected disconnection: {device_name} (ID: {device_id})")
-                except Exception as e:
-                    print(f"Error logging disconnection for {device_name}: {e}")
+            # Check for newly connected devices
+            for device_id, device_name in current_phones.items():
+                if should_log_connection(device_id, device_name):
+                    try:
+                        log_device_event(True, device_name, device_id)
+                        print(f"Auto-detected connection: {device_name} (ID: {device_id})")
+                    except Exception as e:
+                        print(f"Error logging connection for {device_name}: {e}")
             
-            # Update connected device state
-            connected_device_ids = current_device_ids
-            connected_device_names = current_phones.copy()
+            # Check for disconnected devices
+            for device_id, device_name in previously_seen_devices.items():
+                # If device was previously seen but not currently connected
+                if device_id not in current_phones:
+                    if should_log_disconnection(device_id, device_name):
+                        try:
+                            log_device_event(False, device_name, device_id)
+                            print(f"Auto-detected disconnection: {device_name} (ID: {device_id})")
+                        except Exception as e:
+                            print(f"Error logging disconnection for {device_name}: {e}")
             
         except Exception as e:
             print(f"Error in device monitor: {e}")
@@ -477,11 +578,12 @@ def device_disconnected():
 @app.route('/api/device/monitor/status')
 def monitor_status():
     """Get USB device monitor status"""
+    current_phones = get_connected_phones()
     return jsonify({
         "monitoring": device_monitor_running,
-        "connectedDevices": list(connected_device_names.values()),
-        "connectedDeviceIds": list(connected_device_ids),
-        "deviceMapping": connected_device_names,
+        "connectedDevices": list(current_phones.values()),
+        "connectedDeviceIds": list(current_phones.keys()),
+        "deviceMapping": current_phones,
         "checkInterval": USB_CHECK_INTERVAL,
         "phonePatterns": PHONE_PATTERNS
     })
