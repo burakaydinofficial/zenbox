@@ -19,7 +19,7 @@ def init_events_file():
 
 def init_user_config():
     default_config = {
-        "weeklyTarget": 840,  # 840 minutes = 2 hours per day
+        "dailyTarget": 120,  # 120 minutes = 2 hours per day
         "settings": {
             "autoReminder": True,
             "callFiltering": True,
@@ -43,8 +43,25 @@ def save_user_config(config):
     with open(USER_CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2)
 
+def migrate_config_if_needed():
+    """Migrate old config format to new format if needed"""
+    config = load_user_config()
+    
+    # If we have weeklyTarget but no dailyTarget, migrate
+    if "weeklyTarget" in config and "dailyTarget" not in config:
+        config["dailyTarget"] = config["weeklyTarget"] // 7
+        del config["weeklyTarget"]
+        save_user_config(config)
+        print("Migrated config from weeklyTarget to dailyTarget")
+    
+    # Ensure dailyTarget exists
+    if "dailyTarget" not in config:
+        config["dailyTarget"] = 120  # Default 2 hours
+        save_user_config(config)
+
 init_events_file()
 init_user_config()
+migrate_config_if_needed()
 
 def get_data():
     df = pd.read_csv(DEVICE_EVENTS_FILE)
@@ -78,9 +95,9 @@ def get_sessions_from_data(data):
     
     return sessions
 
-def calculate_daily_target(weekly_target):
-    """Calculate daily target from weekly target"""
-    return weekly_target // 7
+def calculate_weekly_target(daily_target):
+    """Calculate weekly target from daily target"""
+    return daily_target * 7
 
 def calculate_today_zen_time(sessions):
     """Calculate today's zen time in minutes from sessions"""
@@ -200,7 +217,7 @@ def device_stats():
     
     # Get user config for calculations
     config = load_user_config()
-    daily_target = calculate_daily_target(config["weeklyTarget"])
+    daily_target = config["dailyTarget"]
     
     # Process sessions
     data = df.values.tolist()
@@ -228,11 +245,11 @@ def device_stats():
 @app.route('/api/user/config', methods=['GET'])
 def get_user_config():
     config = load_user_config()
-    daily_target = calculate_daily_target(config["weeklyTarget"])
+    weekly_target = calculate_weekly_target(config["dailyTarget"])
     
     return jsonify({
-        "weeklyTarget": config["weeklyTarget"],
-        "dailyTarget": daily_target,
+        "dailyTarget": config["dailyTarget"],
+        "weeklyTarget": weekly_target,
         "settings": config["settings"]
     })
 
@@ -243,8 +260,8 @@ def update_user_config():
         current_config = load_user_config()
         
         # Update configuration
-        if "weeklyTarget" in new_config:
-            current_config["weeklyTarget"] = new_config["weeklyTarget"]
+        if "dailyTarget" in new_config:
+            current_config["dailyTarget"] = new_config["dailyTarget"]
         
         if "settings" in new_config:
             current_config["settings"].update(new_config["settings"])
@@ -275,11 +292,11 @@ def update_daily_target():
                 "message": "Daily target must be between 30 and 480 minutes"
             }), 400
         
-        # Convert daily target to weekly target
-        weekly_target = daily_target * 7
+        # Calculate weekly target for reference
+        weekly_target = calculate_weekly_target(daily_target)
         
         config = load_user_config()
-        config["weeklyTarget"] = weekly_target
+        config["dailyTarget"] = daily_target
         save_user_config(config)
         
         return jsonify({

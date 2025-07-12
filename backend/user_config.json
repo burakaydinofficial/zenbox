@@ -1,5 +1,4 @@
 {
-  "weeklyTarget": 840,
   "settings": {
     "autoReminder": true,
     "callFiltering": true,
@@ -11,5 +10,6 @@
       "Thursday",
       "Friday"
     ]
-  }
+  },
+  "dailyTarget": 119
 }
