@@ -1,0 +1,4 @@
+# Flask requirements
+flask
+flask-cors
+pandas
