@@ -25,15 +25,9 @@ function CurrentStatus({ lastSession }) {
 
   return (
     <div className="text-center">
-      <div className={`w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center ${
-        !lastSession?.end ? 'bg-blue-400 animate-pulse' : 'bg-gray-300'
-      }`}>
-        <div className={`w-16 h-16 rounded-full ${
-          !lastSession?.end ? 'bg-blue-500 animate-bounce' : 'bg-gray-400'
-        } flex items-center justify-center`}>
-          <div className={`w-8 h-8 rounded-full ${
-            !lastSession?.end ? 'bg-white' : 'bg-gray-200'
-          }`}></div>
+      <div className={`status-circle ${!lastSession?.end ? 'active' : ''}`}>
+        <div className="inner-circle">
+          <div className="core"></div>
         </div>
       </div>
       <h2 className="text-2xl font-bold mb-2">
@@ -53,21 +47,23 @@ function DailySummary({ todayTotal }) {
     return `${hours}h ${minutes}m`;
   };
 
-  // Assume 8 hours (28800 seconds) as daily target
-  const dailyTarget = 28800;
+  const dailyTarget = 28800; // 8 hours in seconds
   const progress = Math.min((todayTotal / dailyTarget) * 100, 100);
 
   return (
     <div>
-      <h3 className="text-xl font-semibold mb-2">Today's Progress</h3>
-      <div className="mb-2">{formatTime(todayTotal)}</div>
-      <div className="progress-bar">
-        <div 
-          className="progress-bar-fill"
-          style={{ width: `${progress}%` }}
-        ></div>
+      <h3 className="text-xl font-semibold mb-4">Today's Stats</h3>
+      <div className="progress-stats">
+        <div className="stat-value">{formatTime(todayTotal)}</div>
+        <div className="stat-label">Total Time</div>
+        <div className="progress-bar mt-3">
+          <div 
+            className="progress-bar-fill"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+        <div className="text-sm mt-2">Target: {formatTime(dailyTarget)}</div>
       </div>
-      <div className="text-sm mt-1">Target: {formatTime(dailyTarget)}</div>
     </div>
   );
 }
@@ -78,17 +74,17 @@ function WeeklyChart({ weeklyData }) {
   return (
     <div>
       <h3 className="text-xl font-semibold mb-4">Weekly Activity</h3>
-      <div className="flex items-end space-x-2 h-[150px]">
+      <div className="weekly-chart">
         {Object.entries(weeklyData).map(([date, seconds]) => (
-          <div key={date} className="flex-1 flex flex-col items-center">
-            <div className="w-full relative flex-1">
+          <div key={date} className="chart-column">
+            <div className="chart-bar-container">
               <div
-                className="chart-bar absolute bottom-0 w-full"
+                className="chart-bar"
                 style={{ height: `${(seconds / maxTime) * 100}%` }}
               ></div>
             </div>
-            <div className="text-xs mt-2">{date}</div>
-            <div className="text-xs">{Math.floor(seconds / 3600)}h</div>
+            <div className="chart-label">{date}</div>
+            <div className="chart-value">{Math.floor(seconds / 3600)}h</div>
           </div>
         ))}
       </div>
@@ -110,26 +106,20 @@ function SessionsList({ sessions }) {
   return (
     <div>
       <h3 className="text-xl font-semibold mb-4">Recent Sessions</h3>
-      <div className="space-y-3 max-h-[300px] overflow-y-auto">
+      <div className="sessions-list">
         {sessions.map((session, index) => (
           <div key={index} className="session-card">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="text-sm text-gray-600">
-                  Started: {formatDate(session.start)}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {session.end ? `Ended: ${formatDate(session.end)}` : 'Ongoing'}
-                </div>
-                <div className="text-sm font-medium mt-1">
-                  Duration: {Math.floor(session.duration / 60)} minutes
-                </div>
+            <div className="session-header">
+              <div className="session-time">
+                <div>Started: {formatDate(session.start)}</div>
+                <div>{session.end ? `Ended: ${formatDate(session.end)}` : 'Ongoing'}</div>
               </div>
-              <div className={`px-2 py-1 rounded text-xs ${
-                session.end ? 'bg-gray-100' : 'bg-blue-100 text-blue-800'
-              }`}>
+              <div className={`session-status ${!session.end ? 'active' : ''}`}>
                 {session.end ? 'Completed' : 'Active'}
               </div>
+            </div>
+            <div className="session-duration">
+              Duration: {Math.floor(session.duration / 60)} minutes
             </div>
           </div>
         ))}
@@ -181,19 +171,19 @@ function App() {
   }, []);
 
   if (!stats) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+    <div className="loading-screen">
+      <div className="loading-spinner"></div>
     </div>
   );
 
   const todayTotal = Object.values(weeklyData)[6] || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="max-w-4xl mx-auto p-6">
-        <header className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Zenbox</h1>
-          <div className="flex justify-center space-x-4">
+    <div className="app-container">
+      <div className="app-content">
+        <header className="app-header">
+          <h1 className="app-title">Zenbox</h1>
+          <nav className="app-nav">
             {['home', 'stats', 'sessions'].map((screen) => (
               <button
                 key={screen}
@@ -203,31 +193,29 @@ function App() {
                 {screen.charAt(0).toUpperCase() + screen.slice(1)}
               </button>
             ))}
-          </div>
+          </nav>
         </header>
 
-        {currentScreen === 'home' && (
-          <div className="grid grid-cols-2 gap-6">
-            <div className="block bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl text-white">
-              <CurrentStatus lastSession={stats.sessions[stats.sessions.length - 1]} />
+        <main className="main-content">
+          {currentScreen === 'home' ? (
+            <div className="grid-layout">
+              <div className="status-block">
+                <CurrentStatus lastSession={stats.sessions[stats.sessions.length - 1]} />
+              </div>
+              <div className="summary-block">
+                <DailySummary todayTotal={todayTotal} />
+              </div>
             </div>
-            <div className="block bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl text-white">
-              <DailySummary todayTotal={todayTotal} />
+          ) : currentScreen === 'stats' ? (
+            <div className="stats-container">
+              <WeeklyChart weeklyData={weeklyData} />
             </div>
-          </div>
-        )}
-
-        {currentScreen === 'stats' && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <WeeklyChart weeklyData={weeklyData} />
-          </div>
-        )}
-
-        {currentScreen === 'sessions' && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <SessionsList sessions={stats.sessions.slice(-10).reverse()} />
-          </div>
-        )}
+          ) : (
+            <div className="sessions-container">
+              <SessionsList sessions={stats.sessions.slice(-10).reverse()} />
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );
