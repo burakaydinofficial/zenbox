@@ -589,7 +589,8 @@ body {
 .target-value {
   font-size: 0.875rem;
   color: #4b5563;
-  width: 5rem;
+  /* flex-basis: 4rem; */
+  /* Adjusted to fit the new design */
 }
 
 /* Feature Toggles */
