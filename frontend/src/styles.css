@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 50%, #f8f0ff 100%);
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.block {
+  transition: transform 0.2s;
+}
+
+.block:hover {
+  transform: translateY(-2px);
+}
+
+.progress-bar {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 100%);
+  transition: width 0.5s ease;
+  border-radius: 999px;
+}
+
+.nav-button {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 8px;
+}
+
+.nav-button.active {
+  color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.chart-bar {
+  background: linear-gradient(180deg, #60a5fa 0%, #818cf8 100%);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+.session-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.session-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
