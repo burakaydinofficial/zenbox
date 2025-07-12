@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Clock, Award, MapPin, Play, Pause } from 'lucide-react';
 import { useZenMode, useStats, useSettings, useTimeFormat, useProgress } from '../hooks/useZenboxData';
 
@@ -8,6 +8,45 @@ const HomeScreen = () => {
   const { dailyTarget } = useSettings();
   const { formatTime } = useTimeFormat();
   const { getDailyProgress, getDailyProgressWidth } = useProgress();
+  
+  const [zenTimer, setZenTimer] = useState('00:00:00');
+  const [zenStartTime, setZenStartTime] = useState(null);
+
+  // Handle zen mode timer
+  useEffect(() => {
+    let interval = null;
+    
+    if (isZenMode) {
+      // Set start time when zen mode begins
+      if (!zenStartTime) {
+        setZenStartTime(new Date());
+      }
+      
+      // Update timer every second
+      interval = setInterval(() => {
+        if (zenStartTime) {
+          const now = new Date();
+          const elapsed = Math.floor((now - zenStartTime) / 1000);
+          
+          const hours = Math.floor(elapsed / 3600);
+          const minutes = Math.floor((elapsed % 3600) / 60);
+          const seconds = elapsed % 60;
+          
+          setZenTimer(
+            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+          );
+        }
+      }, 1000);
+    } else {
+      // Reset timer when zen mode ends
+      setZenStartTime(null);
+      setZenTimer('00:00:00');
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isZenMode, zenStartTime]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -53,7 +92,7 @@ const HomeScreen = () => {
           </div>
         </div>
         <h2 className={`zen-status-title ${isZenMode ? 'active' : ''}`}>
-          {isZenMode ? 'In Zen Mode' : 'Out of Box'}
+          {isZenMode ? zenTimer : 'Out of Box'}
         </h2>
         <button
           onClick={toggleZenMode}
