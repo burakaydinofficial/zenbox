@@ -31,4 +31,14 @@ This project consists of a Flask backend and a React frontend. The backend serve
 - Build the React app (`npm run build` in `/frontend`), then serve with Flask.
 
 ## API
-- `GET /api/data` — returns device log data as JSON.
+- `GET /api/data` — returns device log data as JSON
+- `POST /api/device/connected` — log device connection event
+- `POST /api/device/disconnected` — log device disconnection event
+- `GET /api/device/stats` — get aggregated connection statistics including total time and sessions
+
+Device events are stored in `device_events.csv` with format:
+```
+timestamp,isConnected
+2025-07-12 10:30,true
+2025-07-12 10:45,false
+```

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 
+// This is the main entry point for the React application
+
 function App() {
   const [data, setData] = useState([]);
 
